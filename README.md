@@ -2,6 +2,9 @@
 
 > One app. One movie. Zero arguments.
 
+## Demo Video
+https://drive.google.com/file/d/1k-X0xgFRCYO7Jp8CivdAZgyjA0vGUzb7/view?usp=sharing
+
 WatchMatch is a group movie recommendation web application that helps friends decide what to watch together. Each person in the group submits movies they love and votes on a mood for the night. WatchMatch analyzes everyone's taste, finds the overlap, and recommends the one movie that works for the whole group — along with where to watch it and a trailer.
 
 ---
