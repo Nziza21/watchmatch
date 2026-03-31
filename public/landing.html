@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WatchMatch — Group Movie Night, Solved</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0a0f1e; color: white; overflow-x: hidden; }
+
+    /* POSTER BACKGROUND */
+    #poster-bg {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 4px; z-index: 0; overflow: hidden; opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+    #poster-bg.loaded { opacity: 1; }
+    #poster-bg img { width: 100%; height: 170px; object-fit: cover; filter: brightness(0.3) saturate(0.7); }
+    #poster-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(to bottom,
+        rgba(10,15,30,0.5) 0%,
+        rgba(10,15,30,0.7) 40%,
+        rgba(10,15,30,0.95) 80%,
+        rgba(10,15,30,1) 100%);
+      z-index: 1;
+    }
+
+    /* LAYOUT */
+    .content { position: relative; z-index: 2; }
+
+    /* NAV */
+    nav {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px 40px; max-width: 1100px; margin: 0 auto;
+    }
+    .nav-logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.5px; }
+    .nav-logo span { color: #e50914; }
+    .nav-btn {
+      background: #e50914; color: white; border: none; padding: 10px 22px;
+      border-radius: 10px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+      font-family: 'Inter', sans-serif; transition: all 0.2s; text-decoration: none;
+      display: inline-block;
+    }
+    .nav-btn:hover { background: #c40812; transform: translateY(-1px); }
+
+    /* HERO */
+    .hero {
+      text-align: center; padding: 80px 24px 60px;
+      max-width: 700px; margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(229,9,20,0.12); border: 1px solid rgba(229,9,20,0.3);
+      border-radius: 20px; padding: 6px 16px; font-size: 0.78rem;
+      color: #fca5a5; font-weight: 600; margin-bottom: 28px;
+      letter-spacing: 0.5px; text-transform: uppercase;
+    }
+    .hero h1 {
+      font-size: clamp(2.8rem, 8vw, 5rem); font-weight: 900;
+      line-height: 1.05; letter-spacing: -2px; margin-bottom: 20px;
+    }
+    .hero h1 .red { color: #e50914; }
+    .hero h1 .dim { color: #334155; }
+    .hero-sub {
+      font-size: 1.1rem; color: #64748b; line-height: 1.7;
+      margin-bottom: 36px; max-width: 480px; margin-left: auto; margin-right: auto;
+    }
+    .hero-sub strong { color: #94a3b8; }
+    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-hero-primary {
+      background: #e50914; color: white; border: none; padding: 16px 36px;
+      border-radius: 14px; font-size: 1rem; font-weight: 700; cursor: pointer;
+      font-family: 'Inter', sans-serif; transition: all 0.2s; text-decoration: none;
+      display: inline-block; letter-spacing: 0.3px;
+    }
+    .btn-hero-primary:hover { background: #c40812; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(229,9,20,0.35); }
+    .btn-hero-ghost {
+      background: rgba(255,255,255,0.07); color: white;
+      border: 1.5px solid rgba(255,255,255,0.15); padding: 16px 36px;
+      border-radius: 14px; font-size: 1rem; font-weight: 600; cursor: pointer;
+      font-family: 'Inter', sans-serif; transition: all 0.2s; text-decoration: none;
+      display: inline-block;
+    }
+    .btn-hero-ghost:hover { background: rgba(255,255,255,0.12); transform: translateY(-2px); }
+
+    /* SOCIAL PROOF */
+    .social-proof {
+      display: flex; justify-content: center; gap: 32px;
+      flex-wrap: wrap; padding: 20px 24px 0; opacity: 0.6;
+    }
+    .proof-item { text-align: center; }
+    .proof-num { font-size: 1.5rem; font-weight: 800; color: white; }
+    .proof-label { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+    /* HOW IT WORKS */
+    .section { padding: 80px 24px; max-width: 1000px; margin: 0 auto; }
+    .section-tag {
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 2px; color: #e50914; margin-bottom: 12px; text-align: center;
+    }
+    .section-title {
+      font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800;
+      text-align: center; letter-spacing: -1px; margin-bottom: 8px;
+    }
+    .section-desc { text-align: center; color: #64748b; font-size: 0.95rem; margin-bottom: 48px; }
+
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+    .step-card {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px; padding: 28px 24px; position: relative;
+      transition: all 0.3s;
+    }
+    .step-card:hover { background: rgba(255,255,255,0.07); transform: translateY(-4px); border-color: rgba(229,9,20,0.3); }
+    .step-num {
+      font-size: 0.75rem; font-weight: 700; color: #e50914;
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px;
+    }
+    .step-icon { font-size: 2rem; margin-bottom: 14px; display: block; }
+    .step-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+    .step-desc { font-size: 0.85rem; color: #64748b; line-height: 1.6; }
+
+    /* MOODS */
+    .moods-section { padding: 0 24px 80px; max-width: 1000px; margin: 0 auto; }
+    .mood-pills { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 32px; }
+    .mood-pill {
+      padding: 12px 20px; border-radius: 50px; font-size: 0.88rem;
+      font-weight: 600; cursor: default; transition: transform 0.2s;
+    }
+    .mood-pill:hover { transform: scale(1.05); }
+    .mp-surprise { background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+    .mp-feelgood { background: rgba(234,179,8,0.2); color: #fde047; border: 1px solid rgba(234,179,8,0.3); }
+    .mp-thrilling { background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+    .mp-emotional { background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); }
+    .mp-mindbending { background: rgba(168,85,247,0.2); color: #d8b4fe; border: 1px solid rgba(168,85,247,0.3); }
+
+    /* WHY */
+    .why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 40px; }
+    .why-card {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px; padding: 22px 20px;
+    }
+    .why-icon { font-size: 1.5rem; margin-bottom: 10px; display: block; }
+    .why-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; }
+    .why-desc { font-size: 0.82rem; color: #64748b; line-height: 1.6; }
+
+    /* CTA */
+    .cta-section {
+      text-align: center; padding: 80px 24px 100px;
+      background: linear-gradient(to bottom, transparent, rgba(229,9,20,0.05), transparent);
+    }
+    .cta-section h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; letter-spacing: -1px; margin-bottom: 12px; }
+    .cta-section p { color: #64748b; margin-bottom: 32px; font-size: 0.95rem; }
+
+    /* FOOTER */
+    footer {
+      text-align: center; padding: 24px; border-top: 1px solid rgba(255,255,255,0.06);
+      color: #334155; font-size: 0.8rem;
+    }
+    footer span { color: #e50914; }
+
+    /* DIVIDER */
+    .divider { height: 1px; background: rgba(255,255,255,0.06); max-width: 1000px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+
+<div id="poster-bg"></div>
+<div id="poster-overlay"></div>
+
+<div class="content">
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-logo">Watch<span>Match</span></div>
+    <a href="/app" class="nav-btn">Launch App →</a>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-badge">Made for movie nights</div>
+    <h1>
+      Stop arguing.<br>
+      Start <span class="red">watching.</span>
+    </h1>
+    <p class="hero-sub">
+      WatchMatch finds the <strong>one perfect movie</strong> for your whole group —
+      based on everyone's taste and tonight's vibe.
+    </p>
+    <div class="hero-actions">
+      <a href="/app" class="btn-hero-primary">Create a Room →</a>
+      <a href="#how" class="btn-hero-ghost">See how it works</a>
+    </div>
+  </div>
+
+  <!-- SOCIAL PROOF -->
+  <div class="social-proof">
+    <div class="proof-item">
+      <div class="proof-num">5</div>
+      <div class="proof-label">Mood filters</div>
+    </div>
+    <div class="proof-item">
+      <div class="proof-num">∞</div>
+      <div class="proof-label">Movies in database</div>
+    </div>
+    <div class="proof-item">
+      <div class="proof-num">0</div>
+      <div class="proof-label">Arguments needed</div>
+    </div>
+    <div class="proof-item">
+      <div class="proof-num">2+</div>
+      <div class="proof-label">People per room</div>
+    </div>
+  </div>
+
+  <div class="divider" style="margin-top:60px"></div>
+
+  <!-- HOW IT WORKS -->
+  <div class="section" id="how">
+    <div class="section-tag">How it works</div>
+    <div class="section-title">Three steps to movie night</div>
+    <p class="section-desc">No accounts. No downloads. Just a link.</p>
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-num">Step 01</div>
+        
+        <div class="step-title">Create a room</div>
+        <p class="step-desc">Pick tonight's vibe — thrilling, feel-good, emotional, or let us surprise you. Then share the link with your group.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 02</div>
+        
+        <div class="step-title">Everyone picks their favorites</div>
+        <p class="step-desc">Each person searches and picks 2–3 movies they love. No pressure, no judgment. Everyone also votes on their vibe.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 03</div>
+        
+        <div class="step-title">Get your match</div>
+        <p class="step-desc">WatchMatch analyzes everyone's taste, finds the overlap, and recommends the one movie that works for the whole group.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- MOODS -->
+  <div class="moods-section">
+    <div class="section-tag" style="text-align:center;padding-top:80px">Mood engine</div>
+    <div class="section-title">What's the vibe tonight?</div>
+    <p class="section-desc">Every person in the room votes on a mood. The majority wins — and shapes the recommendation.</p>
+    <div class="mood-pills">
+      <div class="mood-pill mp-surprise">Surprise me</div>
+      <div class="mood-pill mp-feelgood">Feel-good</div>
+      <div class="mood-pill mp-thrilling">Thrilling</div>
+      <div class="mood-pill mp-emotional">Emotional</div>
+      <div class="mood-pill mp-mindbending">Mind-bending</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- WHY WATCHMATCH -->
+  <div class="section">
+    <div class="section-tag">Why WatchMatch</div>
+    <div class="section-title">Not just another recommendation app</div>
+    <p class="section-desc">Netflix recommends what keeps you on Netflix. We recommend what's right for your group.</p>
+    <div class="why-grid">
+      <div class="why-card">
+       
+        <div class="why-title">Built for groups</div>
+        <p class="why-desc">Every person's taste matters. Not just one person's algorithm profile.</p>
+      </div>
+      <div class="why-card">
+        
+        <div class="why-title">Mood-aware</div>
+        <p class="why-desc">The same group might want something different on a Friday vs a Sunday. Mood voting captures that.</p>
+      </div>
+      <div class="why-card">
+        
+        <div class="why-title">Hidden gems</div>
+        <p class="why-desc">We don't just show popular movies. We find highly rated films that match your taste but you haven't seen.</p>
+      </div>
+      <div class="why-card">
+        
+        <div class="why-title">Where to watch</div>
+        <p class="why-desc">Every recommendation comes with streaming platform info and a JustWatch link for your region.</p>
+      </div>
+      <div class="why-card">
+        
+        <div class="why-title">No account needed</div>
+        <p class="why-desc">Just create a room, share a link, and go. Nothing to sign up for.</p>
+      </div>
+      <div class="why-card">
+        
+        <div class="why-title">Watch the trailer</div>
+        <p class="why-desc">Not sure about the pick? Watch the trailer right inside the app before committing.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <h2>Ready for movie night?</h2>
+    <p>Create a room, share the link, and let WatchMatch do the rest.</p>
+    <a href="/app" class="btn-hero-primary" style="font-size:1.05rem;padding:18px 40px">
+      Create a Room — it's free →
+    </a>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    Built with <span>♥</span> using TMDB API &nbsp;·&nbsp; WatchMatch &nbsp;·&nbsp; Not affiliated with any streaming platform
+  </footer>
+
+</div>
+
+<script>
+  async function loadPosters() {
+    try {
+      const res = await fetch('/api/posters');
+      const posters = await res.json();
+      const bg = document.getElementById('poster-bg');
+      const shuffled = posters.sort(() => Math.random() - 0.5).slice(0, 80);
+      bg.innerHTML = shuffled.map(p => `<img src="${p}" loading="lazy">`).join('');
+      setTimeout(() => bg.classList.add('loaded'), 200);
+    } catch(e) {}
+  }
+  loadPosters();
+</script>
+</body>
+</html>

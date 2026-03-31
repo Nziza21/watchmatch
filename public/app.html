@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WatchMatch — Find Your Movie</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0a0f1e; color: white; min-height: 100vh; overflow-x: hidden; }
+
+    #poster-bg {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 4px; z-index: 0; overflow: hidden; opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+    #poster-bg.loaded { opacity: 1; }
+    #poster-bg img { width: 100%; height: 170px; object-fit: cover; filter: brightness(0.3) saturate(0.7); }
+    #poster-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(to bottom, rgba(10,15,30,0.6) 0%, rgba(10,15,30,0.88) 60%, rgba(10,15,30,1) 100%);
+      z-index: 1;
+    }
+
+    .screen { display: none; position: relative; z-index: 2; padding: 28px 24px; max-width: 520px; margin: 0 auto; min-height: 100vh; }
+    .screen.active { display: block; }
+    .loader-screen { display: none; position: relative; z-index: 2; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 24px; max-width: 520px; margin: 0 auto; }
+    .loader-screen.active { display: flex; }
+    .result-screen { display: none; position: relative; z-index: 2; min-height: 100vh; }
+    .result-screen.active { display: block; }
+
+    .app-logo { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; }
+    .app-logo span { color: #e50914; }
+    .screen-sub { font-size: 0.85rem; color: #475569; margin-bottom: 28px; }
+
+    input {
+      width: 100%; padding: 14px 16px; border-radius: 12px;
+      border: 1.5px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05);
+      color: white; font-size: 0.95rem; margin-bottom: 10px;
+      font-family: 'Inter', sans-serif; transition: border-color 0.2s;
+    }
+    input:focus { outline: none; border-color: #e50914; }
+    input::placeholder { color: #334155; }
+
+    .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; margin-bottom: 10px; font-family: 'Inter', sans-serif; transition: all 0.2s; }
+    .btn-primary { background: #e50914; color: white; }
+    .btn-primary:hover { background: #c40812; transform: translateY(-1px); }
+    .btn-green { background: #16a34a; color: white; }
+    .btn-green:hover { background: #15803d; transform: translateY(-1px); }
+    .btn-ghost { background: rgba(255,255,255,0.06); color: white; border: 1.5px solid rgba(255,255,255,0.1); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+    .btn-outline-red { background: transparent; color: #ef4444; border: 1.5px solid rgba(239,68,68,0.4); }
+    .btn-outline-red:hover { background: rgba(239,68,68,0.1); }
+
+    .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #475569; margin-bottom: 10px; }
+
+    .mood-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+    .mood-card { padding: 16px 12px; border-radius: 14px; border: 1.5px solid transparent; cursor: pointer; text-align: center; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+    .mood-card:hover { transform: translateY(-2px); }
+    .mood-card.selected { border-color: white !important; }
+    .mood-card .label { font-size: 0.85rem; font-weight: 600; }
+    .mood-surprise { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    .mood-surprise:hover { background: rgba(99,102,241,0.25); }
+    .mood-feelgood { background: rgba(234,179,8,0.15); color: #fde047; }
+    .mood-feelgood:hover { background: rgba(234,179,8,0.25); }
+    .mood-thrilling { background: rgba(239,68,68,0.15); color: #fca5a5; }
+    .mood-thrilling:hover { background: rgba(239,68,68,0.25); }
+    .mood-emotional { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .mood-emotional:hover { background: rgba(59,130,246,0.25); }
+    .mood-mindbending { background: rgba(168,85,247,0.15); color: #d8b4fe; }
+    .mood-mindbending:hover { background: rgba(168,85,247,0.25); }
+
+    .search-results { background: rgba(10,15,30,0.96); border-radius: 12px; overflow: hidden; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.07); }
+    .search-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s; }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:hover { background: rgba(255,255,255,0.06); }
+    .search-item img { width: 34px; height: 50px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+    .search-item .s-title { font-size: 0.9rem; font-weight: 500; }
+    .search-item .s-year { font-size: 0.75rem; color: #475569; margin-top: 2px; }
+
+    .pick-counter { font-size: 0.75rem; color: #475569; margin-bottom: 8px; font-weight: 500; }
+    .selected-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+    .movie-chip { display: inline-flex; align-items: center; gap: 8px; background: rgba(229,9,20,0.1); border: 1px solid rgba(229,9,20,0.25); border-radius: 20px; padding: 5px 12px; font-size: 0.8rem; color: #fca5a5; }
+    .movie-chip .remove { cursor: pointer; color: #e50914; font-weight: 700; }
+
+    .share-box { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    .share-link-text { color: #e50914; font-size: 0.8rem; word-break: break-all; font-family: monospace; background: rgba(229,9,20,0.07); padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; line-height: 1.5; }
+
+    .members-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    .member-row { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.85rem; }
+    .member-row:last-child { border-bottom: none; }
+    .member-dot { width: 7px; height: 7px; border-radius: 50%; background: #16a34a; flex-shrink: 0; margin-top: 5px; }
+    .member-name { font-weight: 500; }
+    .member-mood { font-size: 0.72rem; color: #475569; margin-top: 2px; }
+
+    .waiting-pill { display: inline-flex; align-items: center; gap: 8px; background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.25); border-radius: 20px; padding: 7px 14px; font-size: 0.8rem; color: #fde047; margin-bottom: 12px; }
+    .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: #fde047; animation: pulse 1.5s infinite; flex-shrink: 0; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .film-spin { width: 48px; height: 48px; border: 3px solid rgba(229,9,20,0.2); border-top-color: #e50914; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 24px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; }
+    .loader-sub { font-size: 0.85rem; color: #475569; }
+
+    .result-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; filter: blur(30px) brightness(0.2) saturate(1.2); z-index: 0; transform: scale(1.1); }
+    .result-inner { position: relative; z-index: 1; padding: 24px; max-width: 520px; margin: 0 auto; }
+    .result-card { background: rgba(10,15,30,0.82); border-radius: 20px; overflow: hidden; border: 1px solid rgba(255,255,255,0.09); backdrop-filter: blur(24px); margin-bottom: 12px; }
+    .result-poster { width: 100%; max-height: 340px; object-fit: cover; display: block; }
+    .result-body { padding: 22px; }
+    .result-title { font-size: 1.6rem; font-weight: 800; color: white; line-height: 1.2; margin-bottom: 3px; letter-spacing: -0.5px; }
+    .result-year { color: #475569; font-size: 0.85rem; margin-bottom: 10px; }
+    .result-rating { display: inline-flex; align-items: center; gap: 6px; background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.25); border-radius: 20px; padding: 4px 12px; font-size: 0.82rem; color: #fde047; font-weight: 600; margin-bottom: 10px; }
+    .result-genres { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .genre-pill { background: rgba(255,255,255,0.07); border-radius: 20px; padding: 4px 12px; font-size: 0.72rem; color: #64748b; font-weight: 500; }
+    .result-overview { color: #94a3b8; font-size: 0.88rem; line-height: 1.75; margin-bottom: 16px; }
+    .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 14px 0; }
+    .watch-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #475569; margin-bottom: 8px; }
+    .platform-pill { display: inline-block; background: rgba(229,9,20,0.1); border: 1px solid rgba(229,9,20,0.2); color: #fca5a5; border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; font-weight: 600; margin: 2px; }
+    .justwatch-link { display: inline-block; margin-top: 8px; color: #e50914; font-size: 0.82rem; text-decoration: none; font-weight: 500; }
+    .justwatch-link:hover { text-decoration: underline; }
+    .why-card { background: rgba(229,9,20,0.06); border: 1px solid rgba(229,9,20,0.15); border-radius: 14px; padding: 14px; margin-top: 14px; }
+    .why-row { display: flex; gap: 10px; font-size: 0.82rem; color: #64748b; margin-bottom: 6px; line-height: 1.5; }
+    .why-row:last-child { margin-bottom: 0; }
+    .why-row strong { color: #94a3b8; font-weight: 600; }
+    .why-dot { width: 4px; height: 4px; border-radius: 50%; background: #e50914; flex-shrink: 0; margin-top: 7px; }
+    .trailer-btn { width: 100%; background: rgba(239,68,68,0.1); border: 1.5px solid rgba(239,68,68,0.3); color: #fca5a5; border-radius: 10px; padding: 11px; font-size: 0.88rem; font-weight: 600; cursor: pointer; margin-top: 12px; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+    .trailer-btn:hover { background: rgba(239,68,68,0.2); }
+    .trailer-wrap { margin-top: 10px; border-radius: 12px; overflow: hidden; display: none; }
+    .trailer-wrap iframe { width: 100%; height: 220px; border: none; display: block; }
+
+    .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: rgba(10,15,30,0.96); color: white; padding: 11px 20px; border-radius: 10px; font-size: 0.84rem; border-left: 3px solid #e50914; box-shadow: 0 8px 32px rgba(0,0,0,0.5); animation: slideUp 0.3s ease; z-index: 9999; white-space: nowrap; font-family: 'Inter', sans-serif; font-weight: 500; }
+    @keyframes slideUp { from { bottom: 0; opacity: 0; } to { bottom: 28px; opacity: 1; } }
+
+    .back-link { display: inline-flex; align-items: center; gap: 6px; color: #334155; font-size: 0.8rem; text-decoration: none; font-weight: 500; margin-bottom: 28px; transition: color 0.2s; }
+    .back-link:hover { color: #64748b; }
+  </style>
+</head>
+<body>
+
+<div id="poster-bg"></div>
+<div id="poster-overlay"></div>
+
+<!-- HOME -->
+<div class="screen active" id="home">
+  <div style="padding-top:60px;margin-bottom:32px">
+    <a href="/" class="back-link">&#8592; Back to home</a>
+    <div class="app-logo">Watch<span>Match</span></div>
+    <p class="screen-sub">Pick tonight's vibe and create a room</p>
+  </div>
+
+  <div class="section-label">Tonight's vibe</div>
+  <div class="mood-grid">
+    <div class="mood-card mood-surprise selected" onclick="selectMood('any', this)"><span class="label">Surprise me</span></div>
+    <div class="mood-card mood-feelgood" onclick="selectMood('feel-good', this)"><span class="label">Feel-good</span></div>
+    <div class="mood-card mood-thrilling" onclick="selectMood('thrilling', this)"><span class="label">Thrilling</span></div>
+    <div class="mood-card mood-emotional" onclick="selectMood('emotional', this)"><span class="label">Emotional</span></div>
+    <div class="mood-card mood-mindbending" onclick="selectMood('mind-bending', this)"><span class="label">Mind-bending</span></div>
+  </div>
+
+  <button class="btn btn-primary" onclick="createRoom()">Create a Room</button>
+  <button class="btn btn-ghost" onclick="joinFromUrl()">Join a Room</button>
+</div>
+
+<!-- JOIN -->
+<div class="screen" id="join">
+  <div style="padding-top:60px;margin-bottom:32px">
+    <a href="/" class="back-link">&#8592; Back to home</a>
+    <div class="app-logo">Watch<span>Match</span></div>
+    <p class="screen-sub">Enter the room code your friend shared</p>
+  </div>
+  <input type="text" id="joinCode" placeholder="Room code (e.g. a1b2c3d4)">
+  <button class="btn btn-primary" onclick="joinRoom()">Join Room</button>
+</div>
+
+<!-- SUBMIT -->
+<div class="screen" id="submit">
+  <div style="padding-top:32px;margin-bottom:24px">
+    <div class="app-logo">Watch<span>Match</span></div>
+    <p class="screen-sub" id="submitSubtitle">Your name, your vibe, your picks</p>
+  </div>
+
+  <div class="section-label">Your name</div>
+  <input type="text" id="memberName" placeholder="Enter your name">
+
+  <div class="section-label" style="margin-top:6px">Your vibe</div>
+  <div class="mood-grid" id="personalMoodGrid">
+    <div class="mood-card mood-surprise selected" onclick="selectPersonalMood('any', this)"><span class="label">Surprise me</span></div>
+    <div class="mood-card mood-feelgood" onclick="selectPersonalMood('feel-good', this)"><span class="label">Feel-good</span></div>
+    <div class="mood-card mood-thrilling" onclick="selectPersonalMood('thrilling', this)"><span class="label">Thrilling</span></div>
+    <div class="mood-card mood-emotional" onclick="selectPersonalMood('emotional', this)"><span class="label">Emotional</span></div>
+    <div class="mood-card mood-mindbending" onclick="selectPersonalMood('mind-bending', this)"><span class="label">Mind-bending</span></div>
+  </div>
+
+  <div class="section-label">Movies you love</div>
+  <input type="text" id="movieSearch" placeholder="Search for a movie..." oninput="searchMovies()">
+  <div class="search-results" id="searchResults"></div>
+  <div class="pick-counter" id="pickCounter">0 of 3 movies picked</div>
+  <div class="selected-wrap" id="selectedMovies"></div>
+
+  <button class="btn btn-primary" onclick="submitMovies()">Submit My Picks</button>
+
+  <div class="share-box" id="shareBox" style="display:none">
+    <div class="section-label">Invite friends</div>
+    <div class="share-link-text" id="shareLink"></div>
+    <button onclick="copyLink(event)" class="btn btn-ghost" style="width:auto;padding:10px 20px;margin-bottom:0;font-size:0.82rem">Copy Link</button>
+  </div>
+
+  <div class="members-box" id="membersList" style="display:none">
+    <div class="section-label">In the room</div>
+    <div id="membersInner"></div>
+  </div>
+
+  <div id="waitingMsg" style="display:none;margin-bottom:10px">
+    <div class="waiting-pill"><div class="pulse-dot"></div>Waiting for more people to join</div>
+  </div>
+
+  <button id="getRecommendBtn" class="btn btn-green" style="display:none" onclick="getRecommendation()">Get Our Movie</button>
+</div>
+
+<!-- LOADING -->
+<div class="loader-screen" id="loading">
+  <div class="film-spin"></div>
+  <div class="loader-title">Finding your movie...</div>
+  <div class="loader-sub">Analyzing taste and mood for the group</div>
+</div>
+
+<!-- RESULT -->
+<div class="result-screen" id="result">
+  <div class="result-backdrop" id="resultBackdrop"></div>
+  <div class="result-inner">
+    <div style="padding-top:28px;margin-bottom:20px;text-align:center">
+      <div class="app-logo" style="font-size:1.3rem">Watch<span>Match</span></div>
+    </div>
+    <div id="resultContent"></div>
+    <button class="btn btn-outline-red" onclick="getAnother()">Not feeling it — try another</button>
+    <button class="btn btn-ghost" onclick="location.reload()">Start a New Room</button>
+    <br>
+  </div>
+</div>
+
+<script>
+  let currentRoom = null;
+  let selectedMovies = [];
+  let selectedMood = 'any';
+  let personalMood = 'any';
+  let hasSubmitted = false;
+
+  const MOOD_LABELS = {
+    'any': 'Surprise me',
+    'feel-good': 'Feel-good',
+    'thrilling': 'Thrilling',
+    'emotional': 'Emotional',
+    'mind-bending': 'Mind-bending'
+  };
+
+  async function loadPosters() {
+    try {
+      const res = await fetch('/api/posters');
+      const posters = await res.json();
+      const bg = document.getElementById('poster-bg');
+      const shuffled = posters.sort(() => Math.random() - 0.5).slice(0, 60);
+      bg.innerHTML = shuffled.map(p => `<img src="${p}" loading="lazy">`).join('');
+      setTimeout(() => bg.classList.add('loaded'), 100);
+    } catch(e) {}
+  }
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen, .loader-screen, .result-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function showToast(message) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  function selectMood(mood, el) {
+    selectedMood = mood;
+    document.querySelectorAll('#home .mood-card').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  function selectPersonalMood(mood, el) {
+    personalMood = mood;
+    document.querySelectorAll('#personalMoodGrid .mood-card').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  async function createRoom() {
+    const res = await fetch('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mood: selectedMood })
+    });
+    const data = await res.json();
+    currentRoom = data.roomId;
+    personalMood = selectedMood;
+    const moodIndex = ['any','feel-good','thrilling','emotional','mind-bending'].indexOf(selectedMood);
+    document.querySelectorAll('#personalMoodGrid .mood-card').forEach((b,i) => {
+      b.classList.toggle('selected', i === moodIndex);
+    });
+    showScreen('submit');
+    document.getElementById('shareBox').style.display = 'block';
+    document.getElementById('shareLink').textContent = `${location.origin}/app?room=${currentRoom}`;
+    pollMembers();
+  }
+
+  function joinFromUrl() {
+    const params = new URLSearchParams(location.search);
+    const room = params.get('room');
+    if (room) {
+      currentRoom = room;
+      showScreen('submit');
+      pollMembers();
+    } else {
+      showScreen('join');
+    }
+  }
+
+  function joinRoom() {
+    currentRoom = document.getElementById('joinCode').value.trim();
+    if (!currentRoom) return showToast('Enter a room code');
+    showScreen('submit');
+    pollMembers();
+  }
+
+  let searchTimeout;
+  function searchMovies() {
+    clearTimeout(searchTimeout);
+    const q = document.getElementById('movieSearch').value.trim();
+    if (q.length < 2) { document.getElementById('searchResults').innerHTML = ''; return; }
+    searchTimeout = setTimeout(async () => {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const movies = await res.json();
+      document.getElementById('searchResults').innerHTML = movies.map(m => `
+        <div class="search-item" onclick="selectMovie(${m.id}, '${m.title.replace(/'/g,"\\'")}', '${m.year||''}', '${m.poster||''}')">
+          ${m.poster ? `<img src="${m.poster}" alt="">` : '<div style="width:34px;height:50px;background:rgba(255,255,255,0.04);border-radius:6px;flex-shrink:0"></div>'}
+          <div><div class="s-title">${m.title}</div><div class="s-year">${m.year||''}</div></div>
+        </div>
+      `).join('');
+    }, 350);
+  }
+
+  function selectMovie(id, title, year, poster) {
+    if (selectedMovies.length >= 3) return showToast('Maximum 3 movies');
+    if (selectedMovies.find(m => m.id === id)) return showToast('Already added');
+    selectedMovies.push({ id, title, year, poster });
+    document.getElementById('movieSearch').value = '';
+    document.getElementById('searchResults').innerHTML = '';
+    renderSelected();
+    showToast(`Added: ${title}`);
+  }
+
+  function removeMovie(id) {
+    selectedMovies = selectedMovies.filter(m => m.id !== id);
+    renderSelected();
+  }
+
+  function renderSelected() {
+    document.getElementById('pickCounter').textContent = `${selectedMovies.length} of 3 movies picked`;
+    document.getElementById('selectedMovies').innerHTML = selectedMovies.map(m => `
+      <div class="movie-chip">${m.title}${m.year ? ` · ${m.year}` : ''} <span class="remove" onclick="removeMovie(${m.id})">&#x2715;</span></div>
+    `).join('');
+  }
+
+  async function submitMovies() {
+    const name = document.getElementById('memberName').value.trim();
+    if (!name) return showToast('Enter your name first');
+    if (selectedMovies.length < 2) return showToast('Pick at least 2 movies');
+    if (!currentRoom) return showToast('Room not found — use the share link');
+    const res = await fetch(`/api/rooms/${currentRoom}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, movieIds: selectedMovies.map(m => m.id), mood: personalMood })
+    });
+    const data = await res.json();
+    if (data.success) {
+      hasSubmitted = true;
+      document.getElementById('membersList').style.display = 'block';
+      showToast(`Submitted — ${data.members} member(s) in the room`);
+      updateGetBtn(data.members);
+    } else {
+      showToast(data.error || 'Something went wrong');
+    }
+  }
+
+  function updateGetBtn(memberCount) {
+    const btn = document.getElementById('getRecommendBtn');
+    const waiting = document.getElementById('waitingMsg');
+    if (memberCount >= 2 && hasSubmitted) {
+      btn.style.display = 'block';
+      waiting.style.display = 'none';
+    } else if (hasSubmitted) {
+      btn.style.display = 'none';
+      waiting.style.display = 'block';
+    }
+  }
+
+  async function pollMembers() {
+    const interval = setInterval(async () => {
+      if (!currentRoom) return;
+      try {
+        const res = await fetch(`/api/rooms/${currentRoom}/members`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.result && !document.getElementById('result').classList.contains('active')) {
+          clearInterval(interval);
+          renderResult(data.result);
+          return;
+        }
+        if (data.members && data.members.length > 0) {
+          document.getElementById('membersList').style.display = 'block';
+          document.getElementById('membersInner').innerHTML = data.members.map(m => {
+            const vote = data.moodVotes?.[m];
+            return `<div class="member-row"><div class="member-dot"></div><div><div class="member-name">${m}</div>${vote ? `<div class="member-mood">${MOOD_LABELS[vote]}</div>` : ''}</div></div>`;
+          }).join('');
+          updateGetBtn(data.members.length);
+        }
+      } catch(e) {}
+    }, 3000);
+  }
+
+  function renderResult(data) {
+    if (data.backdrop) {
+      document.getElementById('resultBackdrop').style.backgroundImage = `url(${data.backdrop})`;
+    }
+    document.getElementById('resultContent').innerHTML = `
+      <div class="result-card">
+        ${data.poster ? `<img class="result-poster" src="${data.poster}" alt="${data.title}">` : ''}
+        <div class="result-body">
+          <div class="result-title">${data.title}</div>
+          <div class="result-year">${data.year}</div>
+          <div class="result-rating">&#9733; ${data.rating} / 10</div>
+          <div class="result-genres">${(data.genres||[]).map(g=>`<span class="genre-pill">${g}</span>`).join('')}</div>
+          <p class="result-overview">${data.overview}</p>
+          <div class="divider"></div>
+          <div class="watch-label">Where to watch</div>
+          ${data.streaming.length ? data.streaming.map(p=>`<span class="platform-pill">${p}</span>`).join('') : ''}
+          <br>
+          <a class="justwatch-link" href="https://www.justwatch.com/us/search?q=${encodeURIComponent(data.title)}" target="_blank">Find on JustWatch &#8594;</a>
+          ${data.trailerKey ? `
+            <button class="trailer-btn" onclick="toggleTrailer('${data.trailerKey}', this)">Watch Trailer</button>
+            <div class="trailer-wrap" id="trailerWrapper"><iframe src="" id="trailerFrame" allowfullscreen></iframe></div>
+          ` : ''}
+          <div class="why-card">
+            <div class="why-row"><div class="why-dot"></div><div>Picked for: <strong>${data.members.join(', ')}</strong></div></div>
+            <div class="why-row"><div class="why-dot"></div><div>Based on: <strong>${(data.genres||[]).join(', ')}</strong></div></div>
+            ${data.voteSummary ? `<div class="why-row"><div class="why-dot"></div><div>Mood votes: <strong>${data.voteSummary}</strong></div></div>` : ''}
+            <div class="why-row"><div class="why-dot"></div><div>Tonight's vibe: <strong>${data.moodLabel}</strong></div></div>
+          </div>
+        </div>
+      </div>
+    `;
+    showScreen('result');
+  }
+
+  function toggleTrailer(key, btn) {
+    const wrapper = document.getElementById('trailerWrapper');
+    const frame = document.getElementById('trailerFrame');
+    if (wrapper.style.display === 'block') {
+      wrapper.style.display = 'none';
+      frame.src = '';
+      btn.textContent = 'Watch Trailer';
+    } else {
+      wrapper.style.display = 'block';
+      frame.src = `https://www.youtube.com/embed/${key}?autoplay=1`;
+      btn.textContent = 'Close Trailer';
+    }
+  }
+
+  async function getRecommendation() {
+    showScreen('loading');
+    const res = await fetch(`/api/rooms/${currentRoom}/recommend`);
+    const data = await res.json();
+    if (data.error) { showScreen('submit'); showToast(data.error); return; }
+    renderResult(data);
+  }
+
+  async function getAnother() {
+    showScreen('loading');
+    const res = await fetch(`/api/rooms/${currentRoom}/another`);
+    const data = await res.json();
+    if (data.error) { showScreen('result'); showToast(data.error); return; }
+    renderResult(data);
+  }
+
+  function copyLink(event) {
+    const link = document.getElementById('shareLink').textContent;
+    navigator.clipboard.writeText(link).then(() => {
+      const btn = event.target;
+      const orig = btn.textContent;
+      btn.textContent = 'Copied';
+      btn.style.borderColor = '#16a34a';
+      btn.style.color = '#4ade80';
+      setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 2000);
+    });
+  }
+
+  window.onload = () => {
+    loadPosters();
+    const params = new URLSearchParams(location.search);
+    if (params.get('room')) joinFromUrl();
+  };
+</script>
+</body>
+</html>
